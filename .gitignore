@@ -1,5 +1,37 @@
-venv/
-downloads/
+# Python
 __pycache__/
-*.pyc
+*.py[codz]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Project files
+downloads/
 .env
+*.pyc
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cache
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# Temporary files
+tempCodeRunnerFile.py
+.abstra/
+
+# Other
+.pypirc
+.streamlit/secrets.toml
