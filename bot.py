@@ -8,6 +8,7 @@ import subprocess
 from threading import Thread
 from flask import Flask
 import re
+
 app = Flask(__name__)
 @app.route('/')
 def home():
@@ -58,19 +59,24 @@ def get_updates(offset=None):
 def download_video(url, audio_only=False, quality="best"):
     os.makedirs("downloads", exist_ok=True)
     
+    # تنظیمات جدید برای حل مشکل encoding
+    base_cmd = [
+        'yt-dlp',
+        '--no-warnings',
+        '--quiet',
+        '--cookies', 'cookies.txt',
+        '--restrict-filenames',
+        '--no-check-certificate',
+        '--rm-cache-dir',
+        '--output', 'downloads/%(id)s.%(ext)s',
+    ]
+    
     if audio_only:
-        cmd = [
-            'yt-dlp',
+        cmd = base_cmd + [
             '-f', 'bestaudio/best',
             '--extract-audio',
             '--audio-format', 'mp3',
             '--audio-quality', '192',
-            '--cookies', 'cookies.txt',
-            '--restrict-filenames',
-            '-o', 'downloads/%(id)s.%(ext)s',
-            '--no-warnings',
-            '--quiet',
-            url
         ]
     else:
         if quality == "1080p":
@@ -81,20 +87,23 @@ def download_video(url, audio_only=False, quality="best"):
             fmt = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]'
         else:
             fmt = 'best[ext=mp4]/best'
-        
-        cmd = [
-            'yt-dlp',
-            '-f', fmt,
-            '--cookies', 'cookies.txt',
-            '--restrict-filenames',
-            '-o', 'downloads/%(id)s.%(ext)s',
-            '--no-warnings',
-            '--quiet',
-            url
-        ]
+        cmd = base_cmd + ['-f', fmt]
+    
+    cmd.append(url)
     
     try:
-        subprocess.run(cmd, check=True, timeout=300)
+        # تنظیم محیط برای UTF-8
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['LANG'] = 'en_US.UTF-8'
+        env['LC_ALL'] = 'en_US.UTF-8'
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env=env)
+        
+        if result.returncode != 0:
+            print(f"yt-dlp error: {result.stderr}")
+            return None, None
+        
         files = os.listdir('downloads')
         if files:
             return os.path.join('downloads', files[-1]), "دانلود شد"
@@ -115,7 +124,6 @@ while True:
         for u in updates:
             last_id = u["update_id"]
             
-            # مدیریت دکمه‌ها
             if "callback_query" in u:
                 query = u["callback_query"]
                 data = query["data"]
@@ -164,7 +172,6 @@ while True:
                 elif text and not text.startswith("/"):
                     user_data[chat_id] = {"url": text}
                     
-                    # ساخت دکمه‌ها
                     keyboard = {
                         "inline_keyboard": [
                             [{"text": "🎥 1080p", "callback_data": "q_1080p"},
