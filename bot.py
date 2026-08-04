@@ -6,9 +6,8 @@ import requests
 from threading import Thread
 from flask import Flask
 
-# ===== سرور کوچک برای Render =====
+# ===== سرور Flask برای Render =====
 app = Flask(__name__)
-
 @app.route('/')
 def home():
     return "ربات دانلودر آنلاین است!", 200
@@ -16,21 +15,30 @@ def home():
 def run_flask():
     app.run(host='0.0.0.0', port=10000)
 
-# ===== کد اصلی ربات =====
+# ===== تشخیص محیط =====
+IS_RENDER = os.environ.get('RENDER', False)
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 TOKEN = "8493164976:AAHWrtBg5ii8QQY1OXem9dfsVV_C_ZJ5ABU"
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
-PROXY = {
-    'http': 'socks5://127.0.0.1:12334',
-    'https': 'socks5://127.0.0.1:12334'
-}
+# ===== تنظیم پروکسی بر اساس محیط =====
+if IS_RENDER:
+    print("🚀 اجرا روی Render - بدون پروکسی")
+    session = requests.Session()
+    session.verify = False
+else:
+    print("🖥️ اجرا روی سیستم شخصی - با پروکسی Hiddify")
+    PROXY = {
+        'http': 'socks5://127.0.0.1:12334',
+        'https': 'socks5://127.0.0.1:12334'
+    }
+    session = requests.Session()
+    session.proxies = PROXY
+    session.verify = False
 
-session = requests.Session()
-session.proxies = PROXY
-session.verify = False
-
+# ===== توابع ربات =====
 def send_message(chat_id, text):
     url = f"{BASE_URL}/sendMessage"
     data = {"chat_id": chat_id, "text": text}
