@@ -37,7 +37,7 @@ def send_message(chat_id, text, reply_markup=None):
     try:
         session.post(f"{BASE_URL}/sendMessage", json=data, timeout=10)
     except Exception as e:
-        print(f"خطا: {e}")
+        print(f"خطا در ارسال پیام: {e}")
 
 def send_document(chat_id, file_path, caption=""):
     try:
@@ -52,14 +52,18 @@ def get_updates(offset=None):
     try:
         r = session.get(f"{BASE_URL}/getUpdates",
                        params={"timeout": 10, "offset": offset}, timeout=15)
-        return r.json().get("result", []) if r.status_code == 200 else []
-    except:
+        if r.status_code == 200:
+            return r.json().get("result", [])
+        print(f"خطا در دریافت آپدیت: {r.status_code}")
+        return []
+    except Exception as e:
+        print(f"خطا در get_updates: {e}")
         return []
 
 def download_video(url, audio_only=False, quality="best"):
     os.makedirs("downloads", exist_ok=True)
     
-    # تنظیمات جدید برای حل کامل مشکل encoding
+    # تنظیمات پایه
     base_cmd = [
         'yt-dlp',
         '--no-warnings',
@@ -94,28 +98,29 @@ def download_video(url, audio_only=False, quality="best"):
     cmd.append(url)
     
     try:
-        # تنظیم محیط برای UTF-8 و حذف متغیرهای مزاحم
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
         env['LANG'] = 'en_US.UTF-8'
         env['LC_ALL'] = 'en_US.UTF-8'
-        env.pop('PYTHONWARNINGS', None)
         
+        print(f"⏳ شروع دانلود: {url}")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env=env)
         
         if result.returncode != 0:
-            print(f"yt-dlp error: {result.stderr}")
+            print(f"❌ خطای yt-dlp: {result.stderr}")
             return None, None
         
         files = os.listdir('downloads')
         if files:
-            return os.path.join('downloads', files[-1]), "دانلود شد"
+            path = os.path.join('downloads', files[-1])
+            print(f"✅ دانلود کامل شد: {path}")
+            return path, "دانلود شد"
         return None, None
     except subprocess.TimeoutExpired:
-        print("زمان دانلود به پایان رسید")
+        print("⏰ زمان دانلود به پایان رسید")
         return None, None
     except Exception as e:
-        print(f"خطا در دانلود: {e}")
+        print(f"❌ خطا در دانلود: {e}")
         return None, None
 
 print("🤖 ربات روشن شد!")
@@ -130,17 +135,21 @@ while True:
         for u in updates:
             last_id = u["update_id"]
             
+            # مدیریت دکمه‌ها
             if "callback_query" in u:
                 query = u["callback_query"]
                 data = query["data"]
                 chat_id = query["message"]["chat"]["id"]
                 
-                send_message(chat_id, "⏳ دانلود شروع شد...")
+                print(f"🔄 دکمه کلیک شد: {data} از کاربر {chat_id}")
                 
-                url = user_data.get(chat_id, {}).get("url")
-                if not url:
+                url_data = user_data.get(chat_id)
+                if not url_data or not url_data.get("url"):
                     send_message(chat_id, "❌ لینکی پیدا نشد. دوباره بفرست.")
                     continue
+                
+                url = url_data["url"]
+                send_message(chat_id, "⏳ دانلود شروع شد...")
                 
                 if data == "q_audio":
                     path, _ = download_video(url, audio_only=True)
@@ -160,9 +169,12 @@ while True:
                 
                 continue
             
+            # مدیریت پیام‌ها
             if "message" in u:
                 chat_id = u["message"]["chat"]["id"]
                 text = u["message"].get("text", "")
+                
+                print(f"📩 پیام از {chat_id}: {text[:50]}...")
                 
                 if text == "/start":
                     send_message(chat_id, 
@@ -176,7 +188,9 @@ while True:
                         "بعد از ارسال لینک، کیفیت دلخواه رو انتخاب کن.")
                 
                 elif text and not text.startswith("/"):
+                    print(f"📥 لینک دریافت شد: {text}")
                     user_data[chat_id] = {"url": text}
+                    print(f"👤 لینک برای کاربر {chat_id} ذخیره شد")
                     
                     keyboard = {
                         "inline_keyboard": [
@@ -193,7 +207,8 @@ while True:
         
         time.sleep(1)
     except KeyboardInterrupt:
+        print("👋 ربات خاموش شد!")
         break
     except Exception as e:
-        print(f"⚠️ {e}")
+        print(f"⚠️ خطا: {e}")
         time.sleep(5)
