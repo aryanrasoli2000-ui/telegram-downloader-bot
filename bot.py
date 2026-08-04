@@ -7,6 +7,11 @@ from threading import Thread
 from flask import Flask
 import urllib3
 
+# ===== تنظیم محیط برای UTF-8 =====
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+os.environ['LANG'] = 'en_US.UTF-8'
+os.environ['LC_ALL'] = 'en_US.UTF-8'
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ===== سرور Flask برای Render =====
@@ -75,7 +80,12 @@ def get_updates(offset=None):
 def download_video(url, audio_only=False):
     os.makedirs("downloads", exist_ok=True)
     
-    # استفاده از yt-dlp از طریق خط فرمان
+    # تنظیمات محیط برای yt-dlp
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+    env['LANG'] = 'en_US.UTF-8'
+    env['LC_ALL'] = 'en_US.UTF-8'
+    
     try:
         # تنظیمات برای خط فرمان
         if audio_only:
@@ -90,6 +100,7 @@ def download_video(url, audio_only=False):
                 '--output', 'downloads/%(id)s.%(ext)s',
                 '--no-warnings',
                 '--quiet',
+                '--no-check-certificate',
                 url
             ]
         else:
@@ -101,14 +112,33 @@ def download_video(url, audio_only=False):
                 '--output', 'downloads/%(id)s.%(ext)s',
                 '--no-warnings',
                 '--quiet',
+                '--no-check-certificate',
                 url
             ]
         
-        # اجرای دستور
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        # اجرای دستور با محیط تنظیم شده
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env=env)
         
         if result.returncode != 0:
-            raise Exception(f"خطا در اجرای yt-dlp: {result.stderr}")
+            # اگر خطا مربوط به encoding بود، با تنظیمات ساده‌تر امتحان کن
+            if 'UnicodeEncodeError' in result.stderr or 'latin-1' in result.stderr:
+                cmd_simple = [
+                    'yt-dlp',
+                    '-f', 'best[ext=mp4]/best',
+                    '--cookies', 'cookies.txt',
+                    '--restrict-filenames',
+                    '--output', 'downloads/video_%(id)s.%(ext)s',
+                    '--no-warnings',
+                    '--quiet',
+                    '--no-check-certificate',
+                    '--extractor-args', 'youtube:skip=description,metadata',
+                    url
+                ]
+                result = subprocess.run(cmd_simple, capture_output=True, text=True, timeout=300, env=env)
+                if result.returncode != 0:
+                    raise Exception(f"خطا در اجرای yt-dlp: {result.stderr[:200]}")
+            else:
+                raise Exception(f"خطا در اجرای yt-dlp: {result.stderr[:200]}")
         
         # پیدا کردن فایل دانلود شده
         files = os.listdir('downloads')
