@@ -1,4 +1,4 @@
-import sys
+نimport sys
 import os
 import yt_dlp
 import time
@@ -81,15 +81,16 @@ def get_updates(offset=None):
 def download_video(url, audio_only=False):
     os.makedirs("downloads", exist_ok=True)
     
-    # تنظیمات اصلی با محدود کردن نام فایل
+    # استفاده از یک نام فایل ساده با ID ویدیو
     ydl_opts = {
-        'outtmpl': 'downloads/%(title)s.%(ext)s',
+        'outtmpl': 'downloads/%(id)s.%(ext)s',  # فقط از ID ویدیو استفاده کن
         'quiet': False,
         'no_warnings': False,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'cookiefile': 'cookies.txt',
-        'restrictfilenames': True,  # حذف کاراکترهای غیرمجاز از نام فایل
-        'compat_options': ['filename-sanitization'],  # پشتیبانی از اسم‌های غیراستاندارد
+        'restrictfilenames': True,
+        'compat_options': ['filename-sanitization'],
+        'ignoreerrors': True,  # نادیده گرفتن خطاهای جزئی
     }
     
     if audio_only:
@@ -105,20 +106,28 @@ def download_video(url, audio_only=False):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            # نام فایل با ID ساخته میشه
             filename = ydl.prepare_filename(info)
             if audio_only:
                 filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
-            return filename, info.get('title', 'ویدیو')
+            # دریافت عنوان از info
+            title = info.get('title', 'ویدیو')
+            return filename, title
     except Exception as e:
-        # اگر خطا مربوط به encoding بود، از نام ساده استفاده کن
-        if 'latin-1' in str(e) or 'encode' in str(e) or 'Unicode' in str(e):
+        # اگر خطا بود، یک نام فایل پیش‌فرض استفاده کن
+        error_msg = str(e)
+        if 'latin-1' in error_msg or 'encode' in error_msg or 'Unicode' in error_msg:
+            # تلاش با یک نام فایل ساده‌تر
             ydl_opts['outtmpl'] = 'downloads/video_%(id)s.%(ext)s'
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
-                if audio_only:
-                    filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
-                return filename, info.get('title', 'ویدیو')
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    filename = ydl.prepare_filename(info)
+                    if audio_only:
+                        filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
+                    return filename, info.get('title', 'ویدیو')
+            except:
+                raise Exception(f"خطا در دانلود: {e}")
         else:
             raise e
 
