@@ -1,18 +1,13 @@
-import sys
 import os
-import yt_dlp
 import time
-import urllib3
 import requests
+import subprocess
+import json
 from threading import Thread
 from flask import Flask
-import locale
+import urllib3
 
-# ===== تنظیم encoding به روش امن =====
-try:
-    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-except:
-    pass
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ===== سرور Flask برای Render =====
 app = Flask(__name__)
@@ -25,8 +20,6 @@ def run_flask():
 
 # ===== تشخیص محیط =====
 IS_RENDER = os.environ.get('RENDER', False)
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 TOKEN = "8493164976:AAHWrtBg5ii8QQY1OXem9dfsVV_C_ZJ5ABU"
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
@@ -82,62 +75,58 @@ def get_updates(offset=None):
 def download_video(url, audio_only=False):
     os.makedirs("downloads", exist_ok=True)
     
-    # تنظیمات نهایی برای حل مشکل encoding
-    ydl_opts = {
-        'outtmpl': 'downloads/%(id)s.%(ext)s',
-        'quiet': True,
-        'no_warnings': True,
-        'cookiefile': 'cookies.txt',
-        'restrictfilenames': True,
-        'compat_options': ['filename-sanitization'],
-        'ignoreerrors': True,
-        'extract_flat': 'in_playlist',  # فقط اطلاعات اصلی را بگیر
-        'format': 'best[ext=mp4]/best',
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'extractor_args': {
-            'youtube': {
-                'skip': ['hls', 'dash', 'description', 'metadata'],
-                'player_client': ['android', 'web'],
-            }
-        }
-    }
-    
-    if audio_only:
-        ydl_opts['format'] = 'bestaudio/best'
-        ydl_opts['postprocessors'] = [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
-    
+    # استفاده از yt-dlp از طریق خط فرمان
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            if audio_only:
-                filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
-            
-            # عنوان ساده برای کپشن
-            title = info.get('title', f"ویدیو-{info.get('id', 'N/A')}")
-            return filename, title
+        # تنظیمات برای خط فرمان
+        if audio_only:
+            cmd = [
+                'yt-dlp',
+                '-f', 'bestaudio/best',
+                '--extract-audio',
+                '--audio-format', 'mp3',
+                '--audio-quality', '192',
+                '--cookies', 'cookies.txt',
+                '--restrict-filenames',
+                '--output', 'downloads/%(id)s.%(ext)s',
+                '--no-warnings',
+                '--quiet',
+                url
+            ]
+        else:
+            cmd = [
+                'yt-dlp',
+                '-f', 'best[ext=mp4]/best',
+                '--cookies', 'cookies.txt',
+                '--restrict-filenames',
+                '--output', 'downloads/%(id)s.%(ext)s',
+                '--no-warnings',
+                '--quiet',
+                url
+            ]
+        
+        # اجرای دستور
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0:
+            raise Exception(f"خطا در اجرای yt-dlp: {result.stderr}")
+        
+        # پیدا کردن فایل دانلود شده
+        files = os.listdir('downloads')
+        if not files:
+            raise Exception("فایلی دانلود نشد")
+        
+        # گرفتن آخرین فایل
+        filename = os.path.join('downloads', files[-1])
+        
+        # گرفتن عنوان از خروجی
+        title = f"ویدیو از یوتیوب (ID: {os.path.splitext(files[-1])[0]})"
+        
+        return filename, title
+        
+    except subprocess.TimeoutExpired:
+        raise Exception("زمان دانلود به پایان رسید")
     except Exception as e:
-        # اگر خطا بود، با تنظیمات ساده‌تر امتحان کن
-        simple_opts = {
-            'outtmpl': 'downloads/video_%(id)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
-            'cookiefile': 'cookies.txt',
-            'skip_download': False,
-            'format': 'best[ext=mp4]/best',
-            'ignoreerrors': True,
-        }
-        try:
-            with yt_dlp.YoutubeDL(simple_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
-                return filename, f"ویدیو-{info.get('id', 'N/A')}"
-        except Exception as e2:
-            raise Exception(f"خطا در دانلود: {str(e2)}")
+        raise Exception(f"خطا در دانلود: {str(e)}")
 
 print("🤖 ربات روشن شد! منتظر پیام‌های شما هستم...")
 print("📍 برای خروج Ctrl+C رو بزن")
