@@ -16,7 +16,6 @@ def run_flask():
 TOKEN = "8493164976:AAHWrtBg5ii8QQY1OXem9dfsVV_C_ZJ5ABU"
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
-# ===== بدون پروکسی =====
 session = requests.Session()
 session.verify = False
 
@@ -40,9 +39,14 @@ def get_updates(offset=None):
     except:
         return []
 
-def download_video(url):
+def download_video(url, quality="best"):
     os.makedirs("downloads", exist_ok=True)
-    cmd = ['yt-dlp', '-f', 'best[ext=mp4]/best', '-o', 'downloads/%(id)s.%(ext)s', '--no-warnings', url]
+    
+    if quality == "audio":
+        cmd = ['yt-dlp', '-f', 'bestaudio/best', '--extract-audio', '--audio-format', 'mp3', '-o', 'downloads/%(id)s.%(ext)s', '--no-warnings', url]
+    else:
+        cmd = ['yt-dlp', '-f', f'best[height<={quality}][ext=mp4]/best', '-o', 'downloads/%(id)s.%(ext)s', '--no-warnings', url]
+    
     try:
         subprocess.run(cmd, check=True, timeout=300)
         files = os.listdir('downloads')
@@ -52,7 +56,7 @@ def download_video(url):
         pass
     return None
 
-print("🤖 ربات بدون پروکسی روشن شد!")
+print("🤖 ربات روشن شد!")
 Thread(target=run_flask, daemon=True).start()
 
 last_id = 0
@@ -68,24 +72,48 @@ while True:
                 text = u["message"].get("text", "")
                 
                 if text == "/start":
-                    send_message(chat_id, "🎬 لینک ویدیو رو بفرست.")
+                    send_message(chat_id, 
+                        "🎬 **ربات دانلودر**\n\n"
+                        "لینک ویدیو رو بفرست.\n"
+                        "بعدش یکی از اعداد زیر رو بفرست:\n"
+                        "1️⃣ = 1080p\n"
+                        "2️⃣ = 720p\n"
+                        "3️⃣ = 480p\n"
+                        "4️⃣ = فقط صوت (MP3)")
                 
                 elif text.startswith('http'):
                     user_data[chat_id] = {"url": text}
-                    keyboard = {
-                        "inline_keyboard": [
-                            [{"text": "🎥 1080p", "callback_data": "q_1080p"},
-                             {"text": "🎥 720p", "callback_data": "q_720p"}],
-                            [{"text": "🎥 480p", "callback_data": "q_480p"},
-                             {"text": "🎵 صوت", "callback_data": "q_audio"}]
-                        ]
-                    }
-                    send_message(chat_id, "کیفیت رو انتخاب کن:")
-                    session.post(f"{BASE_URL}/sendMessage", json={
-                        "chat_id": chat_id,
-                        "text": "کیفیت رو انتخاب کن:",
-                        "reply_markup": keyboard
-                    })
+                    send_message(chat_id, 
+                        "✅ لینک ذخیره شد.\n"
+                        "حالا عدد ۱ تا ۴ رو بفرست.")
+                
+                elif text in ["1", "2", "3", "4"]:
+                    url_data = user_data.get(chat_id)
+                    if not url_data:
+                        send_message(chat_id, "❌ اول لینک بفرست!")
+                        continue
+                    
+                    url = url_data["url"]
+                    send_message(chat_id, "⏳ دانلود شروع شد...")
+                    
+                    if text == "4":
+                        path = download_video(url, "audio")
+                        if path:
+                            send_document(chat_id, path)
+                            os.remove(path)
+                        else:
+                            send_message(chat_id, "❌ خطا")
+                    else:
+                        quality_map = {"1": "1080", "2": "720", "3": "480"}
+                        quality = quality_map[text]
+                        path = download_video(url, quality)
+                        if path:
+                            send_document(chat_id, path)
+                            os.remove(path)
+                        else:
+                            send_message(chat_id, "❌ خطا")
+                    
+                    user_data[chat_id] = {}
         
         time.sleep(1)
     except Exception as e:
