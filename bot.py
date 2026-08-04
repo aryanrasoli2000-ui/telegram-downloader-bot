@@ -1,3 +1,6 @@
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 import os
 import time
 import requests
@@ -5,7 +8,6 @@ import subprocess
 from threading import Thread
 from flask import Flask
 import re
-
 app = Flask(__name__)
 @app.route('/')
 def home():
