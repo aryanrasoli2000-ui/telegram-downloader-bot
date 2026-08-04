@@ -74,13 +74,14 @@ def get_updates(offset=None):
 def download_video(url, audio_only=False):
     os.makedirs("downloads", exist_ok=True)
     
-    # تنظیمات مشترک برای هر دو حالت
+    # تنظیمات اصلی با محدود کردن نام فایل
     ydl_opts = {
         'outtmpl': 'downloads/%(title)s.%(ext)s',
         'quiet': False,
         'no_warnings': False,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'cookiefile': 'cookies.txt',  # <-- استفاده از کوکی برای احراز هویت
+        'cookiefile': 'cookies.txt',
+        'restrictfilenames': True,  # حذف کاراکترهای غیرمجاز از نام فایل
     }
     
     if audio_only:
@@ -93,12 +94,25 @@ def download_video(url, audio_only=False):
     else:
         ydl_opts['format'] = 'best[ext=mp4]/best'
     
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info)
-        if audio_only:
-            filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
-        return filename, info.get('title', 'ویدیو')
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            if audio_only:
+                filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
+            return filename, info.get('title', 'ویدیو')
+    except Exception as e:
+        # اگر خطا مربوط به encoding بود، از نام ساده استفاده کن
+        if 'latin-1' in str(e) or 'encode' in str(e):
+            ydl_opts['outtmpl'] = 'downloads/video_%(id)s.%(ext)s'
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = ydl.prepare_filename(info)
+                if audio_only:
+                    filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
+                return filename, info.get('title', 'ویدیو')
+        else:
+            raise e
 
 print("🤖 ربات روشن شد! منتظر پیام‌های شما هستم...")
 print("📍 برای خروج Ctrl+C رو بزن")
