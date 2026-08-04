@@ -73,25 +73,26 @@ def get_updates(offset=None):
 
 def download_video(url, audio_only=False):
     os.makedirs("downloads", exist_ok=True)
+    
+    # تنظیمات مشترک برای هر دو حالت
+    ydl_opts = {
+        'outtmpl': 'downloads/%(title)s.%(ext)s',
+        'quiet': False,
+        'no_warnings': False,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'cookiefile': 'cookies.txt',  # <-- استفاده از کوکی برای احراز هویت
+    }
+    
     if audio_only:
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': 'downloads/%(title)s.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'quiet': False,
-        }
+        ydl_opts['format'] = 'bestaudio/best'
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }]
     else:
-        ydl_opts = {
-            'format': 'best[ext=mp4]/best',
-            'outtmpl': 'downloads/%(title)s.%(ext)s',
-            'quiet': False,
-            'no_warnings': False,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        }
+        ydl_opts['format'] = 'best[ext=mp4]/best'
+    
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
