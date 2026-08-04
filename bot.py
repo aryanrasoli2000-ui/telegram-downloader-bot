@@ -1,10 +1,17 @@
-import yt_dlp
+import sys
 import os
+import yt_dlp
 import time
 import urllib3
 import requests
 from threading import Thread
 from flask import Flask
+
+# ===== IMPORTANT: Fix encoding issues =====
+if sys.getdefaultencoding() != 'utf-8':
+    import importlib
+    importlib.reload(sys)
+    sys.setdefaultencoding('utf-8')
 
 # ===== سرور Flask برای Render =====
 app = Flask(__name__)
@@ -82,6 +89,7 @@ def download_video(url, audio_only=False):
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'cookiefile': 'cookies.txt',
         'restrictfilenames': True,  # حذف کاراکترهای غیرمجاز از نام فایل
+        'compat_options': ['filename-sanitization'],  # پشتیبانی از اسم‌های غیراستاندارد
     }
     
     if audio_only:
@@ -103,7 +111,7 @@ def download_video(url, audio_only=False):
             return filename, info.get('title', 'ویدیو')
     except Exception as e:
         # اگر خطا مربوط به encoding بود، از نام ساده استفاده کن
-        if 'latin-1' in str(e) or 'encode' in str(e):
+        if 'latin-1' in str(e) or 'encode' in str(e) or 'Unicode' in str(e):
             ydl_opts['outtmpl'] = 'downloads/video_%(id)s.%(ext)s'
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
