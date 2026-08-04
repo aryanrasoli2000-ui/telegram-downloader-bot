@@ -1,4 +1,4 @@
-نimport os
+import os
 import time
 import requests
 import subprocess
@@ -43,9 +43,26 @@ def download_video(url, quality="best"):
     os.makedirs("downloads", exist_ok=True)
     
     if quality == "audio":
-        cmd = ['yt-dlp', '-f', 'bestaudio/best', '--extract-audio', '--audio-format', 'mp3', '-o', 'downloads/%(id)s.%(ext)s', '--no-warnings', url]
+        cmd = [
+            'yt-dlp',
+            '-f', 'bestaudio/best',
+            '--extract-audio',
+            '--audio-format', 'mp3',
+            '--audio-quality', '192',
+            '-o', 'downloads/%(id)s.%(ext)s',
+            '--no-warnings',
+            '--quiet',
+            url
+        ]
     else:
-        cmd = ['yt-dlp', '-f', f'best[height<={quality}][ext=mp4]/best', '-o', 'downloads/%(id)s.%(ext)s', '--no-warnings', url]
+        cmd = [
+            'yt-dlp',
+            '-f', f'bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality}][ext=mp4]',
+            '-o', 'downloads/%(id)s.%(ext)s',
+            '--no-warnings',
+            '--quiet',
+            url
+        ]
     
     try:
         subprocess.run(cmd, check=True, timeout=300)
@@ -75,7 +92,7 @@ while True:
                     send_message(chat_id, 
                         "🎬 **ربات دانلودر**\n\n"
                         "لینک ویدیو رو بفرست.\n"
-                        "بعدش یکی از اعداد زیر رو بفرست:\n"
+                        "بعدش عدد ۱ تا ۴ رو بفرست:\n"
                         "1️⃣ = 1080p\n"
                         "2️⃣ = 720p\n"
                         "3️⃣ = 480p\n"
@@ -88,12 +105,11 @@ while True:
                         "حالا عدد ۱ تا ۴ رو بفرست.")
                 
                 elif text in ["1", "2", "3", "4"]:
-                    url_data = user_data.get(chat_id)
-                    if not url_data:
-                        send_message(chat_id, "❌ اول لینک بفرست!")
+                    if chat_id not in user_data or "url" not in user_data[chat_id]:
+                        send_message(chat_id, "❌ اول یه لینک معتبر بفرست!")
                         continue
                     
-                    url = url_data["url"]
+                    url = user_data[chat_id]["url"]
                     send_message(chat_id, "⏳ دانلود شروع شد...")
                     
                     if text == "4":
@@ -101,8 +117,9 @@ while True:
                         if path:
                             send_document(chat_id, path)
                             os.remove(path)
+                            send_message(chat_id, "✅ دانلود صوتی کامل شد!")
                         else:
-                            send_message(chat_id, "❌ خطا")
+                            send_message(chat_id, "❌ خطا در دانلود صوت")
                     else:
                         quality_map = {"1": "1080", "2": "720", "3": "480"}
                         quality = quality_map[text]
@@ -110,9 +127,11 @@ while True:
                         if path:
                             send_document(chat_id, path)
                             os.remove(path)
+                            send_message(chat_id, f"✅ ویدیو با کیفیت {quality}p دانلود شد!")
                         else:
-                            send_message(chat_id, "❌ خطا")
+                            send_message(chat_id, "❌ خطا در دانلود ویدیو")
                     
+                    # پاک کردن لینک بعد از دانلود
                     user_data[chat_id] = {}
         
         time.sleep(1)
