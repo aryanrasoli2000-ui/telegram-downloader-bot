@@ -27,10 +27,12 @@ if not IS_RENDER:
         'https': 'socks5://127.0.0.1:12334'
     }
 
-def send_message(chat_id, text):
+def send_message(chat_id, text, reply_markup=None):
+    data = {"chat_id": chat_id, "text": text}
+    if reply_markup:
+        data["reply_markup"] = reply_markup
     try:
-        session.post(f"{BASE_URL}/sendMessage", 
-                    data={"chat_id": chat_id, "text": text}, timeout=10)
+        session.post(f"{BASE_URL}/sendMessage", json=data, timeout=10)
     except Exception as e:
         print(f"خطا: {e}")
 
@@ -95,7 +97,8 @@ def download_video(url, audio_only=False, quality="best"):
         if files:
             return os.path.join('downloads', files[-1]), "دانلود شد"
         return None, None
-    except:
+    except Exception as e:
+        print(f"خطا در دانلود: {e}")
         return None, None
 
 print("🤖 ربات روشن شد!")
@@ -109,57 +112,69 @@ while True:
         updates = get_updates(offset=last_id + 1)
         for u in updates:
             last_id = u["update_id"]
+            
+            # مدیریت دکمه‌ها
+            if "callback_query" in u:
+                query = u["callback_query"]
+                data = query["data"]
+                chat_id = query["message"]["chat"]["id"]
+                
+                send_message(chat_id, "⏳ دانلود شروع شد...")
+                
+                url = user_data.get(chat_id, {}).get("url")
+                if not url:
+                    send_message(chat_id, "❌ لینکی پیدا نشد. دوباره بفرست.")
+                    continue
+                
+                if data == "q_audio":
+                    path, _ = download_video(url, audio_only=True)
+                    if path:
+                        send_document(chat_id, path, "🎵 دانلود صوتی کامل شد!")
+                        os.remove(path)
+                    else:
+                        send_message(chat_id, "❌ خطا در دانلود صوت")
+                else:
+                    quality = data.replace("q_", "")
+                    path, _ = download_video(url, audio_only=False, quality=quality)
+                    if path:
+                        send_document(chat_id, path, f"✅ ویدیو با کیفیت {quality} دانلود شد!")
+                        os.remove(path)
+                    else:
+                        send_message(chat_id, "❌ خطا در دانلود ویدیو")
+                
+                continue
+            
             if "message" in u:
                 chat_id = u["message"]["chat"]["id"]
                 text = u["message"].get("text", "")
                 
                 if text == "/start":
                     send_message(chat_id, 
-                        "🎬 **ربات دانلودر**\n\n"
-                        "لینک ویدیو رو بفرست.\n"
-                        "بعدش یکی از گزینه‌ها رو انتخاب کن:\n"
-                        "1️⃣ = ویدیو 1080p\n"
-                        "2️⃣ = ویدیو 720p\n"
-                        "3️⃣ = ویدیو 480p\n"
-                        "4️⃣ = فقط صوت (MP3)")
+                        "🎬 **ربات دانلودر حرفه‌ای**\n\n"
+                        "لینک ویدیو یا اهنگ رو بفرست.\n"
+                        "پشتیبانی از:\n"
+                        "✅ یوتیوب\n"
+                        "✅ اینستاگرام\n"
+                        "✅ فیسبوک\n"
+                        "✅ تیک‌تاک\n\n"
+                        "بعد از ارسال لینک، کیفیت دلخواه رو انتخاب کن.")
                 
-                elif re.match(r'^https?://', text):
+                elif text and not text.startswith("/"):
                     user_data[chat_id] = {"url": text}
+                    
+                    # ساخت دکمه‌ها
+                    keyboard = {
+                        "inline_keyboard": [
+                            [{"text": "🎥 1080p", "callback_data": "q_1080p"},
+                             {"text": "🎥 720p", "callback_data": "q_720p"}],
+                            [{"text": "🎥 480p", "callback_data": "q_480p"},
+                             {"text": "🎵 فقط صوت (MP3)", "callback_data": "q_audio"}]
+                        ]
+                    }
                     send_message(chat_id, 
-                        "✅ لینک ذخیره شد.\n"
-                        "حالا عدد ۱ تا ۴ رو بفرست:\n"
-                        "1️⃣ = ویدیو 1080p\n"
-                        "2️⃣ = ویدیو 720p\n"
-                        "3️⃣ = ویدیو 480p\n"
-                        "4️⃣ = فقط صوت")
-                
-                elif text in ["1", "2", "3", "4"]:
-                    url_data = user_data.get(chat_id)
-                    if not url_data or not url_data.get("url"):
-                        send_message(chat_id, "❌ اول لینک بفرست!")
-                        continue
-                    
-                    url = url_data["url"]
-                    send_message(chat_id, "⏳ دانلود...")
-                    
-                    if text == "4":
-                        path, _ = download_video(url, audio_only=True)
-                        if path:
-                            send_document(chat_id, path, "🎵 صوت دانلود شد!")
-                            os.remove(path)
-                        else:
-                            send_message(chat_id, "❌ خطا")
-                    else:
-                        quality_map = {"1": "1080p", "2": "720p", "3": "480p"}
-                        quality = quality_map[text]
-                        path, _ = download_video(url, audio_only=False, quality=quality)
-                        if path:
-                            send_document(chat_id, path, f"✅ ویدیو {quality} دانلود شد!")
-                            os.remove(path)
-                        else:
-                            send_message(chat_id, "❌ خطا")
-                    
-                    user_data[chat_id] = {}
+                        "📹 لینک دریافت شد!\n\n"
+                        "حالا یکی از گزینه‌های زیر رو انتخاب کن:",
+                        reply_markup=keyboard)
         
         time.sleep(1)
     except KeyboardInterrupt:
