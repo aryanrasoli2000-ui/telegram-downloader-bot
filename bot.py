@@ -1,4 +1,4 @@
-import os
+نimport os
 import time
 import requests
 import subprocess
@@ -16,6 +16,7 @@ def run_flask():
 TOKEN = "8493164976:AAHWrtBg5ii8QQY1OXem9dfsVV_C_ZJ5ABU"
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
+# ===== بدون پروکسی =====
 session = requests.Session()
 session.verify = False
 
@@ -51,7 +52,7 @@ def download_video(url):
         pass
     return None
 
-print("🤖 ربات روشن شد!")
+print("🤖 ربات بدون پروکسی روشن شد!")
 Thread(target=run_flask, daemon=True).start()
 
 last_id = 0
@@ -80,7 +81,6 @@ while True:
                         ]
                     }
                     send_message(chat_id, "کیفیت رو انتخاب کن:")
-                    # ارسال دکمه با reply_markup
                     session.post(f"{BASE_URL}/sendMessage", json={
                         "chat_id": chat_id,
                         "text": "کیفیت رو انتخاب کن:",
