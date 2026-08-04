@@ -59,7 +59,7 @@ def get_updates(offset=None):
 def download_video(url, audio_only=False, quality="best"):
     os.makedirs("downloads", exist_ok=True)
     
-    # تنظیمات جدید برای حل مشکل encoding
+    # تنظیمات جدید برای حل کامل مشکل encoding
     base_cmd = [
         'yt-dlp',
         '--no-warnings',
@@ -68,6 +68,8 @@ def download_video(url, audio_only=False, quality="best"):
         '--restrict-filenames',
         '--no-check-certificate',
         '--rm-cache-dir',
+        '--compat-options', 'filename-sanitization',
+        '--extractor-args', 'youtube:skip=description,metadata,webpage',
         '--output', 'downloads/%(id)s.%(ext)s',
     ]
     
@@ -92,11 +94,12 @@ def download_video(url, audio_only=False, quality="best"):
     cmd.append(url)
     
     try:
-        # تنظیم محیط برای UTF-8
+        # تنظیم محیط برای UTF-8 و حذف متغیرهای مزاحم
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
         env['LANG'] = 'en_US.UTF-8'
         env['LC_ALL'] = 'en_US.UTF-8'
+        env.pop('PYTHONWARNINGS', None)
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env=env)
         
@@ -107,6 +110,9 @@ def download_video(url, audio_only=False, quality="best"):
         files = os.listdir('downloads')
         if files:
             return os.path.join('downloads', files[-1]), "دانلود شد"
+        return None, None
+    except subprocess.TimeoutExpired:
+        print("زمان دانلود به پایان رسید")
         return None, None
     except Exception as e:
         print(f"خطا در دانلود: {e}")
