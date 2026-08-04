@@ -6,12 +6,13 @@ import urllib3
 import requests
 from threading import Thread
 from flask import Flask
+import locale
 
-# ===== IMPORTANT: Fix encoding issues =====
-if sys.getdefaultencoding() != 'utf-8':
-    import importlib
-    importlib.reload(sys)
-    sys.setdefaultencoding('utf-8')
+# ===== تنظیم encoding به روش امن =====
+try:
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+except:
+    pass
 
 # ===== سرور Flask برای Render =====
 app = Flask(__name__)
@@ -81,19 +82,22 @@ def get_updates(offset=None):
 def download_video(url, audio_only=False):
     os.makedirs("downloads", exist_ok=True)
     
-    # تنظیمات جدید: غیرفعال کردن خواندن متادیتا
+    # تنظیمات نهایی برای حل مشکل encoding
     ydl_opts = {
-        'outtmpl': 'downloads/%(id)s.%(ext)s',  # فقط از ID استفاده کن
-        'quiet': True,  # خروجی کمتر
+        'outtmpl': 'downloads/%(id)s.%(ext)s',
+        'quiet': True,
         'no_warnings': True,
-        'extract_flat': True,  # اطلاعات کمتری بخوان
         'cookiefile': 'cookies.txt',
         'restrictfilenames': True,
         'compat_options': ['filename-sanitization'],
         'ignoreerrors': True,
+        'extract_flat': 'in_playlist',  # فقط اطلاعات اصلی را بگیر
+        'format': 'best[ext=mp4]/best',
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'extractor_args': {
             'youtube': {
-                'skip': ['hls', 'dash', 'description', 'metadata'],  # متادیتا را نادیده بگیر
+                'skip': ['hls', 'dash', 'description', 'metadata'],
+                'player_client': ['android', 'web'],
             }
         }
     }
@@ -105,8 +109,6 @@ def download_video(url, audio_only=False):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }]
-    else:
-        ydl_opts['format'] = 'best[ext=mp4]/best'
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -114,30 +116,28 @@ def download_video(url, audio_only=False):
             filename = ydl.prepare_filename(info)
             if audio_only:
                 filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
-            # یک عنوان ساده برای کپشن
-            title = f"ویدیو از یوتیوب (ID: {info.get('id', 'N/A')})"
+            
+            # عنوان ساده برای کپشن
+            title = info.get('title', f"ویدیو-{info.get('id', 'N/A')}")
             return filename, title
     except Exception as e:
-        # اگر باز هم خطا بود، فقط ویدیو را دانلود کن
-        error_msg = str(e)
-        if 'latin-1' in error_msg or 'encode' in error_msg or 'Unicode' in error_msg:
-            # تنظیمات نهایی: فقط دانلود، بدون هیچ اطلاعاتی
-            simple_opts = {
-                'outtmpl': 'downloads/video_%(id)s.%(ext)s',
-                'quiet': True,
-                'no_warnings': True,
-                'cookiefile': 'cookies.txt',
-                'skip_download': False,
-                'format': 'best[ext=mp4]/best',
-                'extract_flat': True,
-                'ignoreerrors': True,
-            }
+        # اگر خطا بود، با تنظیمات ساده‌تر امتحان کن
+        simple_opts = {
+            'outtmpl': 'downloads/video_%(id)s.%(ext)s',
+            'quiet': True,
+            'no_warnings': True,
+            'cookiefile': 'cookies.txt',
+            'skip_download': False,
+            'format': 'best[ext=mp4]/best',
+            'ignoreerrors': True,
+        }
+        try:
             with yt_dlp.YoutubeDL(simple_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 filename = ydl.prepare_filename(info)
-                return filename, f"ویدیو (ID: {info.get('id', 'N/A')})"
-        else:
-            raise e
+                return filename, f"ویدیو-{info.get('id', 'N/A')}"
+        except Exception as e2:
+            raise Exception(f"خطا در دانلود: {str(e2)}")
 
 print("🤖 ربات روشن شد! منتظر پیام‌های شما هستم...")
 print("📍 برای خروج Ctrl+C رو بزن")
