@@ -35,8 +35,12 @@ def send_document(chat_id, file_path):
 def get_updates(offset=None):
     try:
         r = session.get(f"{BASE_URL}/getUpdates", params={"timeout": 10, "offset": offset}, timeout=15)
-        return r.json().get("result", []) if r.status_code == 200 else []
-    except:
+        if r.status_code == 200:
+            return r.json().get("result", [])
+        print(f"خطا در دریافت آپدیت: {r.status_code}")
+        return []
+    except Exception as e:
+        print(f"خطا در get_updates: {e}")
         return []
 
 def download_video(url, quality="best"):
@@ -68,9 +72,11 @@ def download_video(url, quality="best"):
         subprocess.run(cmd, check=True, timeout=300)
         files = os.listdir('downloads')
         if files:
-            return os.path.join('downloads', files[-1])
-    except:
-        pass
+            # گرفتن آخرین فایل
+            files.sort(key=lambda x: os.path.getmtime(os.path.join('downloads', x)), reverse=True)
+            return os.path.join('downloads', files[0])
+    except Exception as e:
+        print(f"خطا در دانلود: {e}")
     return None
 
 print("🤖 ربات روشن شد!")
@@ -87,6 +93,8 @@ while True:
             if "message" in u:
                 chat_id = u["message"]["chat"]["id"]
                 text = u["message"].get("text", "")
+                
+                print(f"📩 پیام از {chat_id}: {text[:30]}...")
                 
                 if text == "/start":
                     send_message(chat_id, 
@@ -131,10 +139,13 @@ while True:
                         else:
                             send_message(chat_id, "❌ خطا در دانلود ویدیو")
                     
-                    # پاک کردن لینک بعد از دانلود
-                    user_data[chat_id] = {}
+                    # لینک رو نگه دار برای دفعات بعد
+                    # user_data[chat_id] = {}  # این خط رو حذف کردم
         
         time.sleep(1)
+    except KeyboardInterrupt:
+        print("👋 ربات خاموش شد!")
+        break
     except Exception as e:
-        print(f"⚠️ {e}")
+        print(f"⚠️ خطا: {e}")
         time.sleep(5)
