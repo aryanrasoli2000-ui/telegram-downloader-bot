@@ -76,9 +76,10 @@ def get_updates(offset=None):
 def download_video(url, quality="best"):
     os.makedirs("downloads", exist_ok=True)
     
+    # استفاده از --cookies-from-browser به جای cookies.txt
     cmd = [
         'yt-dlp',
-        '--cookies', 'cookies.txt',
+        '--cookies-from-browser', 'chrome',  # ← تغییر اصلی
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         '--no-warnings',
         '--quiet',
