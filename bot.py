@@ -18,6 +18,10 @@ TOKEN = "8493164976:AAHWrtBg5ii8QQY1OXem9dfsVV_C_ZJ5ABU"
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
 session = requests.Session()
+# ===== غیرفعال کردن پروکسی =====
+session.trust_env = False
+session.proxies = {}
+# ================================
 session.verify = False
 
 # ===== سیستم شمارش کاربران =====
@@ -41,7 +45,7 @@ def get_user_count():
 # ==============================
 
 # ===== پنل مدیریت =====
-ADMIN_ID = 8493164976  # ایدی عددی خودت (از @userinfobot بگیر)
+ADMIN_ID = 8493164976
 
 def is_admin(chat_id):
     return chat_id == ADMIN_ID
@@ -125,7 +129,6 @@ while True:
                 chat_id = u["message"]["chat"]["id"]
                 text = u["message"].get("text", "")
                 
-                # ذخیره کاربر
                 save_user(chat_id)
                 
                 if text == "/start":
@@ -142,7 +145,6 @@ while True:
                     count = get_user_count()
                     send_message(chat_id, f"👥 **تعداد کاربران ربات:** {count}")
                 
-                # ===== دستورات مدیریت =====
                 elif text == "/broadcast" and is_admin(chat_id):
                     user_data[chat_id] = {"mode": "broadcast"}
                     send_message(chat_id, "📢 پیام عمومی رو بفرست:")
@@ -157,7 +159,6 @@ while True:
                             pass
                     send_message(chat_id, f"✅ پیام به {len(users)} کاربر ارسال شد.")
                     user_data[chat_id] = {}
-                # ===========================
                 
                 elif text.startswith('http'):
                     user_data[chat_id] = {"url": text}
