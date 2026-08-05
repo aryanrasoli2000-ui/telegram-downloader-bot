@@ -40,6 +40,13 @@ def get_user_count():
     return len(load_users())
 # ==============================
 
+# ===== پنل مدیریت =====
+ADMIN_ID = 8493164976  # ایدی عددی خودت (از @userinfobot بگیر)
+
+def is_admin(chat_id):
+    return chat_id == ADMIN_ID
+# =====================
+
 def send_message(chat_id, text):
     try:
         session.post(f"{BASE_URL}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=10)
@@ -134,6 +141,23 @@ while True:
                 elif text == "/stats":
                     count = get_user_count()
                     send_message(chat_id, f"👥 **تعداد کاربران ربات:** {count}")
+                
+                # ===== دستورات مدیریت =====
+                elif text == "/broadcast" and is_admin(chat_id):
+                    user_data[chat_id] = {"mode": "broadcast"}
+                    send_message(chat_id, "📢 پیام عمومی رو بفرست:")
+                
+                elif chat_id in user_data and user_data[chat_id].get("mode") == "broadcast":
+                    msg = text
+                    users = load_users()
+                    for uid in users:
+                        try:
+                            send_message(uid, f"📢 پیام از مدیریت:\n\n{msg}")
+                        except:
+                            pass
+                    send_message(chat_id, f"✅ پیام به {len(users)} کاربر ارسال شد.")
+                    user_data[chat_id] = {}
+                # ===========================
                 
                 elif text.startswith('http'):
                     user_data[chat_id] = {"url": text}
