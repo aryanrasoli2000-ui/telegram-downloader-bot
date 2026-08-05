@@ -76,17 +76,17 @@ def get_updates(offset=None):
 def download_video(url, quality="best"):
     os.makedirs("downloads", exist_ok=True)
     
-    # استفاده از --cookies-from-browser به جای cookies.txt
+    # تنظیمات قوی برای yt-dlp
     cmd = [
         'yt-dlp',
-        '--cookies-from-browser', 'chrome',  # ← تغییر اصلی
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        '--no-check-certificate',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         '--no-warnings',
         '--quiet',
-        '--no-check-certificate',
         '-o', 'downloads/%(id)s.%(ext)s'
     ]
     
+    # انتخاب کیفیت
     if quality == "audio":
         cmd.extend([
             '-f', 'bestaudio/best',
