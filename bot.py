@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import subprocess
+import json
 from threading import Thread
 from flask import Flask
 
@@ -18,6 +19,26 @@ BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
 session = requests.Session()
 session.verify = False
+
+# ===== سیستم شمارش کاربران =====
+USERS_FILE = 'users.json'
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r') as f:
+            return json.load(f)
+    return []
+
+def save_user(user_id):
+    users = load_users()
+    if user_id not in users:
+        users.append(user_id)
+        with open(USERS_FILE, 'w') as f:
+            json.dump(users, f)
+
+def get_user_count():
+    return len(load_users())
+# ==============================
 
 def send_message(chat_id, text):
     try:
@@ -44,7 +65,6 @@ def get_updates(offset=None):
 def download_video(url, quality="best"):
     os.makedirs("downloads", exist_ok=True)
     
-    # دستورات پایه
     cmd = [
         'yt-dlp',
         '--cookies', 'cookies.txt',
@@ -55,7 +75,6 @@ def download_video(url, quality="best"):
         '-o', 'downloads/%(id)s.%(ext)s'
     ]
     
-    # انتخاب کیفیت
     if quality == "audio":
         cmd.extend([
             '-f', 'bestaudio/best',
@@ -78,7 +97,6 @@ def download_video(url, quality="best"):
         subprocess.run(cmd, check=True, timeout=300)
         files = os.listdir('downloads')
         if files:
-            # گرفتن آخرین فایل
             files.sort(key=lambda x: os.path.getmtime(os.path.join('downloads', x)), reverse=True)
             return os.path.join('downloads', files[0])
     except Exception as e:
@@ -100,6 +118,9 @@ while True:
                 chat_id = u["message"]["chat"]["id"]
                 text = u["message"].get("text", "")
                 
+                # ذخیره کاربر
+                save_user(chat_id)
+                
                 if text == "/start":
                     send_message(chat_id, 
                         "🎬 **ربات دانلودر**\n\n"
@@ -109,6 +130,10 @@ while True:
                         "2️⃣ = 720p\n"
                         "3️⃣ = 480p\n"
                         "4️⃣ = فقط صوت (MP3)")
+                
+                elif text == "/stats":
+                    count = get_user_count()
+                    send_message(chat_id, f"👥 **تعداد کاربران ربات:** {count}")
                 
                 elif text.startswith('http'):
                     user_data[chat_id] = {"url": text}
