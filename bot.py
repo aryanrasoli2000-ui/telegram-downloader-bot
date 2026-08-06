@@ -18,13 +18,17 @@ TOKEN = "8493164976:AAHWrtBg5ii8QQY1OXem9dfsVV_C_ZJ5ABU"
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
 session = requests.Session()
-# ===== غیرفعال کردن پروکسی =====
-session.trust_env = False
-session.proxies = {}
-# ================================
+
+# ===== تنظیم پروکسی =====
+PROXY_URL = "socks5://127.0.0.1:12334"  # پورت فیلترشکن خودت رو بذار
+session.proxies = {
+    'http': PROXY_URL,
+    'https': PROXY_URL,
+}
+# ========================
+
 session.verify = False
 
-# ===== سیستم شمارش کاربران =====
 USERS_FILE = 'users.json'
 
 def load_users():
@@ -42,14 +46,11 @@ def save_user(user_id):
 
 def get_user_count():
     return len(load_users())
-# ==============================
 
-# ===== پنل مدیریت =====
 ADMIN_ID = 8493164976
 
 def is_admin(chat_id):
     return chat_id == ADMIN_ID
-# =====================
 
 def send_message(chat_id, text):
     try:
@@ -73,49 +74,40 @@ def get_updates(offset=None):
     except:
         return []
 
-def download_video(url, quality="best"):
+def download_video(url):
     os.makedirs("downloads", exist_ok=True)
     
-    # تنظیمات قوی برای yt-dlp
+    # حذف فایل قبلی
+    if os.path.exists('downloads/video.mp4'):
+        os.remove('downloads/video.mp4')
+    
+    # ===== تنظیم پروکسی برای yt-dlp =====
     cmd = [
         'yt-dlp',
+        '--proxy', PROXY_URL,  # استفاده از پروکسی برای دانلود
+        '-f', 'best[ext=mp4]',
+        '-o', 'downloads/video.mp4',
         '--no-check-certificate',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        '--no-warnings',
-        '--quiet',
-        '-o', 'downloads/%(id)s.%(ext)s'
+        url
     ]
     
-    # انتخاب کیفیت
-    if quality == "audio":
-        cmd.extend([
-            '-f', 'bestaudio/best',
-            '--extract-audio',
-            '--audio-format', 'mp3',
-            '--audio-quality', '192'
-        ])
-    elif quality == "1080":
-        cmd.extend(['-f', 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]'])
-    elif quality == "720":
-        cmd.extend(['-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]'])
-    elif quality == "480":
-        cmd.extend(['-f', 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]'])
-    else:
-        cmd.extend(['-f', 'best[ext=mp4]/best'])
-    
-    cmd.append(url)
-    
     try:
-        subprocess.run(cmd, check=True, timeout=300)
-        files = os.listdir('downloads')
-        if files:
-            files.sort(key=lambda x: os.path.getmtime(os.path.join('downloads', x)), reverse=True)
-            return os.path.join('downloads', files[0])
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0:
+            print(f"❌ خطا: {result.stderr}")
+            return None
+        
+        if os.path.exists('downloads/video.mp4') and os.path.getsize('downloads/video.mp4') > 0:
+            return 'downloads/video.mp4'
+        else:
+            return None
+            
     except Exception as e:
-        print(f"خطا در دانلود: {e}")
-    return None
+        print(f"❌ خطا: {e}")
+        return None
 
-print("🤖 ربات روشن شد!")
+print("🤖 ربات با پروکسی روشن شد!")
 Thread(target=run_flask, daemon=True).start()
 
 last_id = 0
@@ -173,24 +165,13 @@ while True:
                     url = user_data[chat_id]["url"]
                     send_message(chat_id, "⏳ دانلود شروع شد...")
                     
-                    if text == "4":
-                        path = download_video(url, "audio")
-                        if path:
-                            send_document(chat_id, path)
-                            os.remove(path)
-                            send_message(chat_id, "✅ دانلود صوتی کامل شد!")
-                        else:
-                            send_message(chat_id, "❌ خطا در دانلود صوت")
+                    path = download_video(url)
+                    if path:
+                        send_document(chat_id, path)
+                        os.remove(path)
+                        send_message(chat_id, "✅ دانلود کامل شد!")
                     else:
-                        quality_map = {"1": "1080", "2": "720", "3": "480"}
-                        quality = quality_map[text]
-                        path = download_video(url, quality)
-                        if path:
-                            send_document(chat_id, path)
-                            os.remove(path)
-                            send_message(chat_id, f"✅ ویدیو با کیفیت {quality}p دانلود شد!")
-                        else:
-                            send_message(chat_id, "❌ خطا در دانلود ویدیو")
+                        send_message(chat_id, "❌ خطا در دانلود ویدیو")
         
         time.sleep(1)
     except KeyboardInterrupt:
