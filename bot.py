@@ -3,31 +3,16 @@ import time
 import requests
 import subprocess
 import json
-from threading import Thread
-from flask import Flask
-
-app = Flask(__name__)
-@app.route('/')
-def home():
-    return "ربات دانلودر آنلاین!", 200
-
-def run_flask():
-    app.run(host='0.0.0.0', port=10000)
 
 TOKEN = "8493164976:AAHWrtBg5ii8QQY1OXem9dfsVV_C_ZJ5ABU"
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
+# ===== بدون پروکسی =====
 session = requests.Session()
-
-# ===== تنظیم پروکسی =====
-PROXY_URL = "socks5://127.0.0.1:12334"  # پورت فیلترشکن خودت رو بذار
-session.proxies = {
-    'http': PROXY_URL,
-    'https': PROXY_URL,
-}
-# ========================
-
+session.trust_env = False
+session.proxies = {'http': None, 'https': None}
 session.verify = False
+# ======================
 
 USERS_FILE = 'users.json'
 
@@ -76,39 +61,19 @@ def get_updates(offset=None):
 
 def download_video(url):
     os.makedirs("downloads", exist_ok=True)
-    
-    # حذف فایل قبلی
     if os.path.exists('downloads/video.mp4'):
         os.remove('downloads/video.mp4')
     
-    # ===== تنظیم پروکسی برای yt-dlp =====
-    cmd = [
-        'yt-dlp',
-        '--proxy', PROXY_URL,  # استفاده از پروکسی برای دانلود
-        '-f', 'best[ext=mp4]',
-        '-o', 'downloads/video.mp4',
-        '--no-check-certificate',
-        url
-    ]
-    
+    cmd = ['yt-dlp', '-f', 'best[ext=mp4]', '-o', 'downloads/video.mp4', url]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        
-        if result.returncode != 0:
-            print(f"❌ خطا: {result.stderr}")
-            return None
-        
+        subprocess.run(cmd, check=True, timeout=300)
         if os.path.exists('downloads/video.mp4') and os.path.getsize('downloads/video.mp4') > 0:
             return 'downloads/video.mp4'
-        else:
-            return None
-            
-    except Exception as e:
-        print(f"❌ خطا: {e}")
-        return None
+    except:
+        pass
+    return None
 
-print("🤖 ربات با پروکسی روشن شد!")
-Thread(target=run_flask, daemon=True).start()
+print("🤖 ربات روشن شد!")
 
 last_id = 0
 user_data = {}
